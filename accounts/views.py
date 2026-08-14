@@ -9,6 +9,9 @@ from .serializers import (
     ProfileSerializer,
 )
 
+from .models import User
+from .permissions import IsAdminRole
+
 
 class SignupView(generics.CreateAPIView):
     serializer_class = SignupSerializer
@@ -31,3 +34,11 @@ class ProfileView(generics.RetrieveAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class AdminUserListView(generics.ListAPIView):
+    serializer_class = ProfileSerializer
+    permission_classes = [IsAuthenticated, IsAdminRole]
+
+    def get_queryset(self):
+        return User.objects.all().order_by("-date_joined")

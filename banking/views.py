@@ -1,18 +1,17 @@
-from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
-
 from .models import BankAccount,Transaction
 from .serializers import BankAccountSerializer,TransferSerializer
 from rest_framework import status
 from rest_framework.response import Response
 from .serializers import MoneyTransactionSerializer,TransactionSerializer
 from django.db import transaction as db_transaction, models
-
-from datetime import datetime, time
-
-from django.utils import timezone
+from datetime import datetime
 from rest_framework import generics
 from rest_framework.exceptions import ValidationError
+from accounts.permissions import IsAdminRole
+
+
+
 
 
 class CreateBankAccountView(generics.CreateAPIView):
@@ -316,3 +315,52 @@ class TransactionHistoryView(generics.ListAPIView):
                 })
 
         return queryset
+
+
+class AdminAccountListView(generics.ListAPIView):
+    serializer_class = BankAccountSerializer
+    permission_classes = [IsAuthenticated, IsAdminRole]
+
+    def get_queryset(self):
+        return (
+            BankAccount.objects
+            .select_related("user")
+            .all()
+            .order_by("-created_at")
+        )
+
+class AdminAccountDetailView(generics.RetrieveAPIView):
+    serializer_class = BankAccountSerializer
+    permission_classes = [IsAuthenticated, IsAdminRole]
+    queryset = BankAccount.objects.select_related("user").all()
+
+
+class AdminTransactionListView(generics.ListAPIView):
+    serializer_class = TransactionSerializer
+    permission_classes = [IsAuthenticated, IsAdminRole]
+
+    def get_queryset(self):
+        return (
+            Transaction.objects
+            .select_related("from_account", "to_account")
+            .all()
+            .order_by("-timestamp")
+        )
+
+
+class AdminAccountTransactionListView(generics.ListAPIView):
+    serializer_class = TransactionSerializer
+    permission_classes = [IsAuthenticated, IsAdminRole]
+
+    def get_queryset(self):
+        account_id = self.kwargs["account_id"]
+
+        return (
+            Transaction.objects
+            .filter(
+                models.Q(from_account_id=account_id)
+                | models.Q(to_account_id=account_id)
+            )
+            .select_related("from_account", "to_account")
+            .order_by("-timestamp")
+        )
