@@ -11,6 +11,8 @@ from .views import (
     AdminAccountDetailView,
     AdminTransactionListView,
     AdminAccountTransactionListView,
+    AdminBlockAccountView,
+    AdminUnblockAccountView,
 )
 
 urlpatterns = [
@@ -24,4 +26,6 @@ urlpatterns = [
     path("admin/accounts/<int:pk>/",AdminAccountDetailView.as_view(),name="admin-account-detail",),
     path("admin/transactions/",AdminTransactionListView.as_view(),name="admin-transactions",),
     path("admin/transactions/<int:account_id>/",AdminAccountTransactionListView.as_view(),name="admin-account-transactions",),
+    path("admin/accounts/<int:pk>/block/",AdminBlockAccountView.as_view(),name="admin-account-block",),
+    path("admin/accounts/<int:pk>/unblock/",AdminUnblockAccountView.as_view(),name="admin-account-unblock",),
 ]

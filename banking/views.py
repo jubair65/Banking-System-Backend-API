@@ -9,7 +9,9 @@ from datetime import datetime
 from rest_framework import generics
 from rest_framework.exceptions import ValidationError
 from accounts.permissions import IsAdminRole
-
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
 
 
 
@@ -363,4 +365,55 @@ class AdminAccountTransactionListView(generics.ListAPIView):
             )
             .select_related("from_account", "to_account")
             .order_by("-timestamp")
+        )
+
+
+
+class AdminBlockAccountView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminRole]
+
+    def post(self, request, pk):
+        try:
+            account = BankAccount.objects.get(pk=pk)
+        except BankAccount.DoesNotExist:
+            return Response(
+                {"detail": "Bank account not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        account.status = BankAccount.Status.BLOCKED
+        account.save(update_fields=["status"])
+
+        return Response(
+            {
+                "message": "Bank account blocked successfully.",
+                "account_number": account.account_number,
+                "status": account.status,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class AdminUnblockAccountView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminRole]
+
+    def post(self, request, pk):
+        try:
+            account = BankAccount.objects.get(pk=pk)
+        except BankAccount.DoesNotExist:
+            return Response(
+                {"detail": "Bank account not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        account.status = BankAccount.Status.ACTIVE
+        account.save(update_fields=["status"])
+
+        return Response(
+            {
+                "message": "Bank account unblocked successfully.",
+                "account_number": account.account_number,
+                "status": account.status,
+            },
+            status=status.HTTP_200_OK,
         )
