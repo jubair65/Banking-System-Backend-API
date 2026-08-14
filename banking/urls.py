@@ -5,6 +5,7 @@ from .views import (
     MyBankAccountView,
     DepositView,
     WithdrawView,
+    TransferView,
 )
 
 urlpatterns = [
@@ -12,4 +13,5 @@ urlpatterns = [
     path("account/me/",MyBankAccountView.as_view(),name="account-me",),
     path("deposit/",DepositView.as_view(),name="deposit",),
     path("withdraw/",WithdrawView.as_view(),name="withdraw",),
+    path("transfer/",TransferView.as_view(),name="transfer",),
 ]

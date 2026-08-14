@@ -67,3 +67,12 @@ class TransactionSerializer(serializers.ModelSerializer):
         if obj.to_account:
             return obj.to_account.account_number
         return None
+
+
+class TransferSerializer(serializers.Serializer):
+    to_account = serializers.CharField(max_length=10)
+    amount = serializers.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+    )

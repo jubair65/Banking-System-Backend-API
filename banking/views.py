@@ -2,7 +2,7 @@ from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 
 from .models import BankAccount,Transaction
-from .serializers import BankAccountSerializer
+from .serializers import BankAccountSerializer,TransferSerializer
 from rest_framework import status
 from rest_framework.response import Response
 from .serializers import MoneyTransactionSerializer
@@ -135,3 +135,102 @@ class WithdrawView(generics.GenericAPIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+
+class TransferView(generics.GenericAPIView):
+    serializer_class = TransferSerializer
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        amount = serializer.validated_data["amount"]
+        receiver_account_number = serializer.validated_data["to_account"]
+
+        try:
+            sender = request.user.bank_account
+        except BankAccount.DoesNotExist:
+            return Response(
+                {"detail": "Sender bank account not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if sender.status != BankAccount.Status.ACTIVE:
+            return Response(
+                {"detail": "Sender bank account is blocked."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            receiver = BankAccount.objects.get(
+                account_number=receiver_account_number
+            )
+        except BankAccount.DoesNotExist:
+            return Response(
+                {"detail": "Receiver bank account not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if sender.pk == receiver.pk:
+            return Response(
+                {"detail": "You cannot transfer money to your own account."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if receiver.status != BankAccount.Status.ACTIVE:
+            return Response(
+                {"detail": "Receiver bank account is blocked."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        with db_transaction.atomic():
+            account_ids = sorted([sender.pk, receiver.pk])
+
+            locked_accounts = list(
+                BankAccount.objects
+                .select_for_update()
+                .filter(pk__in=account_ids)
+                .order_by("pk")
+            )
+
+            locked_accounts_by_id = {
+                account.pk: account for account in locked_accounts
+            }
+
+            sender = locked_accounts_by_id[sender.pk]
+            receiver = locked_accounts_by_id[receiver.pk]
+
+            if sender.balance < amount:
+                return Response(
+                    {"detail": "Insufficient balance."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            sender.balance -= amount
+            receiver.balance += amount
+
+            sender.save(update_fields=["balance"])
+            receiver.save(update_fields=["balance"])
+
+            transaction_record = Transaction.objects.create(
+                from_account=sender,
+                to_account=receiver,
+                amount=amount,
+                type=Transaction.TransactionType.TRANSFER,
+            )
+
+        return Response(
+            {
+                "message": "Transfer successful.",
+                "transaction_id": transaction_record.id,
+                "from_account": sender.account_number,
+                "to_account": receiver.account_number,
+                "amount": amount,
+                "sender_balance": sender.balance,
+                "receiver_balance": receiver.balance,
+            },
+            status=status.HTTP_200_OK,
+        )
+
