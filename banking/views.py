@@ -5,8 +5,14 @@ from .models import BankAccount,Transaction
 from .serializers import BankAccountSerializer,TransferSerializer
 from rest_framework import status
 from rest_framework.response import Response
-from .serializers import MoneyTransactionSerializer
-from django.db import transaction as db_transaction
+from .serializers import MoneyTransactionSerializer,TransactionSerializer
+from django.db import transaction as db_transaction, models
+
+from datetime import datetime, time
+
+from django.utils import timezone
+from rest_framework import generics
+from rest_framework.exceptions import ValidationError
 
 
 class CreateBankAccountView(generics.CreateAPIView):
@@ -234,3 +240,79 @@ class TransferView(generics.GenericAPIView):
             status=status.HTTP_200_OK,
         )
 
+
+class TransactionHistoryView(generics.ListAPIView):
+    serializer_class = TransactionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        try:
+            account = self.request.user.bank_account
+        except BankAccount.DoesNotExist:
+            return Transaction.objects.none()
+
+        queryset = (
+            Transaction.objects
+            .filter(
+                models.Q(from_account=account)
+                | models.Q(to_account=account)
+            )
+            .select_related("from_account", "to_account")
+            .order_by("-timestamp")
+        )
+
+        transaction_type = self.request.query_params.get("type")
+        date_from = self.request.query_params.get("date_from")
+        date_to = self.request.query_params.get("date_to")
+
+        valid_types = {
+            Transaction.TransactionType.DEPOSIT,
+            Transaction.TransactionType.WITHDRAW,
+            Transaction.TransactionType.TRANSFER,
+        }
+
+        if transaction_type:
+            if transaction_type not in valid_types:
+                raise ValidationError({
+                    "type": "Invalid transaction type."
+                })
+
+            queryset = queryset.filter(type=transaction_type)
+
+        if date_from:
+            try:
+                parsed_date_from = datetime.strptime(
+                    date_from,
+                    "%Y-%m-%d"
+                ).date()
+            except ValueError:
+                raise ValidationError({
+                    "date_from": "Use YYYY-MM-DD format."
+                })
+
+            queryset = queryset.filter(
+                timestamp__date__gte=parsed_date_from
+            )
+
+        if date_to:
+            try:
+                parsed_date_to = datetime.strptime(
+                    date_to,
+                    "%Y-%m-%d"
+                ).date()
+            except ValueError:
+                raise ValidationError({
+                    "date_to": "Use YYYY-MM-DD format."
+                })
+
+            queryset = queryset.filter(
+                timestamp__date__lte=parsed_date_to
+            )
+
+        if date_from and date_to:
+            if parsed_date_from > parsed_date_to:
+                raise ValidationError({
+                    "detail": "date_from cannot be later than date_to."
+                })
+
+        return queryset
