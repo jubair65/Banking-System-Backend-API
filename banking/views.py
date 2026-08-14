@@ -272,6 +272,7 @@ class TransactionHistoryView(generics.ListAPIView):
             Transaction.TransactionType.TRANSFER,
         }
 
+        # Transaction type filter
         if transaction_type:
             if transaction_type not in valid_types:
                 raise ValidationError({
@@ -279,6 +280,10 @@ class TransactionHistoryView(generics.ListAPIView):
                 })
 
             queryset = queryset.filter(type=transaction_type)
+
+        # Parse dates
+        parsed_date_from = None
+        parsed_date_to = None
 
         if date_from:
             try:
@@ -291,10 +296,6 @@ class TransactionHistoryView(generics.ListAPIView):
                     "date_from": "Use YYYY-MM-DD format."
                 })
 
-            queryset = queryset.filter(
-                timestamp__date__gte=parsed_date_from
-            )
-
         if date_to:
             try:
                 parsed_date_to = datetime.strptime(
@@ -306,17 +307,29 @@ class TransactionHistoryView(generics.ListAPIView):
                     "date_to": "Use YYYY-MM-DD format."
                 })
 
-            queryset = queryset.filter(
-                timestamp__date__lte=parsed_date_to
-            )
-
-        if date_from and date_to:
+        # Validate date range
+        if parsed_date_from and parsed_date_to:
             if parsed_date_from > parsed_date_to:
                 raise ValidationError({
                     "detail": "date_from cannot be later than date_to."
                 })
 
+        # Apply date filters
+        if parsed_date_from:
+            queryset = queryset.filter(
+                timestamp__date__gte=parsed_date_from
+            )
+
+        if parsed_date_to:
+            queryset = queryset.filter(
+                timestamp__date__lte=parsed_date_to
+            )
+
         return queryset
+
+
+
+
 
 
 class AdminAccountListView(generics.ListAPIView):
