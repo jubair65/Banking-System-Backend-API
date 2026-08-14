@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import BankAccount
+from .models import BankAccount,Transaction
 
 
 @admin.register(BankAccount)
@@ -22,3 +22,27 @@ class BankAccountAdmin(admin.ModelAdmin):
         "user__username",
         "user__email",
     )
+
+
+
+
+
+@admin.register(Transaction)
+class TransactionAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "type",
+        "from_account",
+        "to_account",
+        "amount",
+        "timestamp",
+    )
+    list_filter = (
+        "type",
+        "timestamp",
+    )
+    search_fields = (
+        "from_account__account_number",
+        "to_account__account_number",
+    )
+    ordering = ("-timestamp",)

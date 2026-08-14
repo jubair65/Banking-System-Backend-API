@@ -57,3 +57,38 @@ class BankAccount(models.Model):
 
     def __str__(self):
         return f"{self.account_number} - {self.user.username}"
+
+
+
+class Transaction(models.Model):
+    class TransactionType(models.TextChoices):
+        DEPOSIT = "deposit", "Deposit"
+        WITHDRAW = "withdraw", "Withdraw"
+        TRANSFER = "transfer", "Transfer"
+
+    from_account = models.ForeignKey(
+        BankAccount,
+        on_delete=models.CASCADE,
+        related_name="outgoing_transactions",
+        null=True,
+        blank=True,
+    )
+    to_account = models.ForeignKey(
+        BankAccount,
+        on_delete=models.CASCADE,
+        related_name="incoming_transactions",
+        null=True,
+        blank=True,
+    )
+    amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+    )
+    type = models.CharField(
+        max_length=20,
+        choices=TransactionType.choices,
+    )
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.type} - {self.amount}"
